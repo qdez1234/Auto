@@ -25,6 +25,7 @@ ui.startScriptBtn.on("click", () => {
     // 使用 threads.start 将阻塞操作放到非 UI 线程中执行
     threads.start(function () {
         start();
+        startCountdown()
     });
 });
 
@@ -34,13 +35,23 @@ let pullDownCount = 0; // 往下滑的次数
 let filteredFrameLayouts = []; // 关键字过滤之后笔记
 let selectedFrameLayouts = []; // 关键字笔记只保留一部笔记
 let currentIndex = 0; // 点击笔记索引
+let packageName = 'com.xingin.xhs'
+let countdownDuration = random(12, 25) * 60 * 1000; // 12到25分钟，以毫秒为单位
+
+let timeFlag = true
 
 /**
  * 脚本主逻辑
  */
 function start() {
-    // 启动应用
-    launchApp("小红书");
+    home();
+    sleep(1000);
+    // 找到分身应用的图标并点击
+    // let appName = "小红书(分身)";
+    let appName = "小红书";
+    let appIcon = text(appName).findOne();
+    appIcon.click();
+
 
     // 延时
     sleepRandomDelay(4, 7);
@@ -48,7 +59,7 @@ function start() {
     // 点击元素
     id("du6").findOne().click();
 
-    sleepRandomDelay(2, 5);
+    sleepRandomDelay(2, 6);
 
     singleFlow();
 }
@@ -57,6 +68,12 @@ function start() {
  * 单次滑动
  */
 function singleFlow() {
+    if (!timeFlag) {
+        console.log("时间到，停止脚本");
+        kill(packageName);
+        return;
+    }
+
     if (random(20, 40) < pullDownCount) {
         pullDownCount = 0;
         start();
@@ -64,20 +81,25 @@ function singleFlow() {
     }
 
     if (flagBook()) {
+        console.log('---------------------点击笔记---------------------')
         clickBook();
         sleepRandomDelay(3, 6);
 
         // 随机滚动图片1-3次
+        console.log('---------------------随机滚动图片1-3次---------------------')
         swiperReviewFour();
-        sleepRandomDelay(1, 4);
-
+        sleepRandomDelay(2, 6);
+        console.log('---------------------评论区下滑---------------------')
         donwReviewFour();
+
+        console.log('---------------------点击喜欢图片---------------------')
         clickLike();
-        sleepRandomDelay(1, 4);
+        sleepRandomDelay(2, 5);
 
+        console.log('---------------------返回---------------------')
         clickBack();
-        sleepRandomDelay(1, 4);
-
+        sleepRandomDelay(2, 5);
+        console.log('---------------------首页笔记瞎话---------------------')
         randomSwipe(2, 5);
 
         singleFlow();
@@ -98,19 +120,19 @@ function randomSwipe(minCount, maxCount) {
 
     // 计算中间 2/3 区域的边界
     let middleAreaLeft = screenWidth / 6; // 中间 2/3 区域的左边界
-    let middleAreaRight = screenWidth * 5 / 6; // 中间 2/3 区域的右边界
+    let middleAreaRight = screenWidth / 6; // 中间 2/3 区域的右边界
     let middleAreaTop = screenHeight / 6; // 中间 2/3 区域的上边界
-    let middleAreaBottom = screenHeight * 5 / 6; // 中间 2/3 区域的下边界
+    let middleAreaBottom = screenHeight / 6; // 中间 2/3 区域的下边界
 
     // 随机生成滑动次数，范围在[minCount, maxCount]之间
     let swipeCount = random(minCount, maxCount);
 
     for (let i = 0; i < swipeCount; i++) {
         // 随机生成滑动的起始和结束位置（限制在中间 2/3 区域）
-        let startX = random(middleAreaLeft, middleAreaRight); // 随机生成x坐标，范围在中间 2/3 区域
-        let startY = random(middleAreaBottom * 0.8, middleAreaBottom); // 随机生成y坐标，范围在中间 2/3 区域的底部附近
-        let endX = startX; // x坐标不变
-        let endY = random(middleAreaTop, middleAreaTop * 1.5); // 随机生成滑动的结束y坐标，范围在中间 2/3 区域的顶部附近
+        let startX = random(middleAreaLeft, middleAreaRight * 5); // 随机生成x坐标，范围在中间 2/3 区域
+        let startY = random(middleAreaBottom * 5, middleAreaBottom * 4); // 随机生成y坐标，范围在中间 2/3 区域的底部附近
+        let endX = startX; // x坐标不
+        let endY = random(middleAreaTop * 3, middleAreaTop * 2); // 随机生成滑动的结束y坐标，范围在中间 2/3 区域的顶部附近
 
         // 随机生成滑动时间，范围在300ms到600ms之间
         let duration = random(300, 600); // 生成300到600之间的随机数，单位为毫秒
@@ -138,16 +160,19 @@ function random(min, max) {
  * 生成随机延迟时间并休眠
  */
 function sleepRandomDelay(min, max) {
-    let time = Math.random(min*1000 , max*1000)
+    let time = random(min * 1000, max * 1000);
     sleep(time);
 }
-
 /**
  * 判断当前列表是否有关键字笔记
  */
 function flagBook() {
+    // 清空数组
+    filteredFrameLayouts = [];
+    selectedFrameLayouts = [];
+
     // 关键字数组
-    let keywords = ["洗纹身", "纹身", "纹身去除"];
+    let keywords = ["洗纹身", "纹身", "纹身去除", "皮肤"];
 
     // 等待直到找到所有 className 为 android.widget.FrameLayout 的视图集合
     let frameLayouts = className("android.widget.FrameLayout").untilFind();
@@ -191,9 +216,14 @@ function flagBook() {
             let randomIndex = Math.floor(Math.random() * filteredFrameLayouts.length);
             selectedFrameLayouts.push(filteredFrameLayouts[randomIndex]);
         }
-
+        if (selectedFrameLayouts.length > 0) {
+            console.log('最终选择的 FrameLayout:', selectedFrameLayouts);
+            return true
+        }
+        else {
+            return false
+        }
         // 输出选择的 FrameLayout 数组
-        console.log('最终选择的 FrameLayout:', selectedFrameLayouts);
 
         return true;
     } else {
@@ -220,7 +250,7 @@ function donwReviewFour() {
     let num = random(2, 5);
     for (let i = 0; i < num; i++) {
         swipeUpFromBottom();
-        sleepRandomDelay(1, 2);
+        sleepRandomDelay(2, 5);
     }
 }
 
@@ -232,6 +262,7 @@ function clickBook() {
     if (selectedFrameLayouts.length > 0) {
         // 获取第一个选中的 FrameLayout 元素
         let firstElement = selectedFrameLayouts[currentIndex];
+        console.log("点击的元素", firstElement);
 
         // 获取该元素的边界（坐标）
         let bounds = firstElement.bounds();  // { left, top, right, bottom }
@@ -250,20 +281,17 @@ function clickBook() {
             click(x, y); // 在计算出的坐标位置进行点击
 
             // 更新索引，确保不超过数组长度
-            // currentIndex++;
+            currentIndex++;
 
-            filteredFrameLayouts = [];
-            selectedFrameLayouts = [];
-            currentIndex = 0;
-
-            // 如果索引超过数组长度，则不再点击
+            // 如果索引超过数组长度，则清空数组并重置索引
             if (currentIndex >= selectedFrameLayouts.length) {
-                // 可以在这里添加逻辑
+                filteredFrameLayouts = [];
+                selectedFrameLayouts = [];
+                currentIndex = 0;
             }
         }
     }
 }
-
 /**
  * 在符合条件的 FrameLayout 元素上执行一次滑动操作
  */
@@ -302,6 +330,11 @@ function swipeFrameLayout() {
         let startX = random(midX, excludeRight); // 从中间到右边 1/5 区域随机选择
         let endX = random(left, midX); // 从左边到中间随机选择
 
+        // 确保 startX > endX 以实现从右向左滑动
+        if (startX < endX) {
+            [startX, endX] = [endX, startX];
+        }
+
         // 随机生成滑动时间（110ms 到 130ms 之间）
         let swipeDuration = random(110, 130);
 
@@ -328,7 +361,7 @@ function swipeUpFromBottom() {
     let startX = random(screenWidth / 5, (screenWidth / 5) * 4);
 
     // 随机选择起点 Y 坐标（下方 4/5 区域内）
-    let startY = random(bottomAreaTop * 3, bottomAreaTop * 4);
+    let startY = random(bottomAreaTop * 2.8, bottomAreaTop * 4);
 
     let endY = random(bottomAreaTop * 1, bottomAreaTop * 3);
 
@@ -367,13 +400,12 @@ function clickLike() {
         if (random(1, 10) > 8 && startCount <= 50) {         //随机1-10 大于7才能点赞
             startCount++;
             click(x, y);
+            console.log("点赞成功，当前点赞次数：" + startCount);
         }
-        // 点击元素的中心坐标
     } else {
         console.log("未找到指定元素");
     }
 }
-
 /**
  * 点击返回
  */
@@ -406,3 +438,13 @@ function clickBack() {
         console.log("未找到指定元素");
     }
 }
+/**
+ * 启动倒计时
+ */
+function startCountdown() {
+    console.log("倒计时开始！");
+    setTimeout(() => {
+        console.log("15分钟倒计时结束！");
+        timeFlag = false
+    }, countdownDuration);
+};
