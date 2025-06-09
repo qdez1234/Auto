@@ -52,7 +52,6 @@ var state = {
     currentNoteIndex: 0,
     isRunning: true,
     countdownDuration: random(CONFIG.MIN_RUN_TIME, CONFIG.MAX_RUN_TIME),
-    currentRun: 0,
     waiting: false,
     waitTime: "0分0秒"
 };
@@ -166,8 +165,8 @@ var SwipeSimulator = {
         // 随机水平偏移（模拟手指自然移动）
         var endX = startX + random(-screen.width * 0.1, screen.width * 0.1);
         
-        // 随机滑动时间（400-1200ms）
-        var duration = random(400, 1200);
+        // 随机滑动时间（400-800ms）
+        var duration = random(300, 600);
         
         LOG.INFO("首页" + (swipeUp ? "上滑" : "下滑") + ": (" + startX + "," + startY + ") -> (" + endX + "," + endY + ")");
         this.humanSwipe(startX, startY, endX, endY, duration);
@@ -278,60 +277,9 @@ ui.startScriptBtn.on("click", function() {
 
 ui.stopScriptBtn.on("click", function() {
     LOG.INFO("用户点击了停止脚本按钮");
-    stopScript();
-    toast("脚本已停止");
 });
-// ------------------------- 核心功能 -------------------------
-// 全局定时器引用
-var countdownInterval = null;
-var heartBeatInterval = null;
-
-function stopScript() {
-    LOG.INFO("正在停止脚本");
-    
-    // 清理定时器
-    if (countdownInterval) clearInterval(countdownInterval);
-    if (heartBeatInterval) clearInterval(heartBeatInterval);
-    
-    
-    device.cancelKeepingAwake();
-    LOG.INFO("已取消屏幕常亮");
-    LOG.INFO("脚本已完全停止");
-}
-// 启动小红书应用
-function launchApp() {
-    LOG.INFO("正在查找小红书应用图标");
-    var appIcon = text(CONFIG.APP_NAME).findOne(5000);
-    if (!appIcon) {
-        LOG.ERROR("找不到小红书应用图标");
-        throw new Error("找不到小红书应用图标");
-    }
-    
-    LOG.INFO("点击小红书应用图标");
-    appIcon.click();
-    sleepRandomDelay(4, 8);
-        
-    LOG.INFO("查找首页元素");
-    var homeElement = id(CONFIG.HOME_ELEMENT_ID).findOne(5000);
-    if (!homeElement) {
-        LOG.ERROR("找不到首页元素");
-        throw new Error("找不到首页元素");
-    }
-    
-    LOG.INFO("点击首页元素");
-    homeElement.click();
-    sleepRandomDelay(3, 6);
-}
 
 // ------------------------- 开始执行流程 -------------------------
-//根据配置参数设置可以执行几次流程
-function runMultiple(){
-    if(state.currentRun>=CONFIG.DAILY_RUN_TIMES){
-        return
-    }
-    state.currentRun=state.currentRun+1
-    LOG.INFO("开始第" + state.currentRun+"次运行")   
-}
 
 //单次流程
 function runSingle(){
@@ -339,24 +287,104 @@ function runSingle(){
         LOG.INFO("开始单次运行流程");
         
         LOG.INFO("返回桌面");
+
         home();
+
         sleepRandomDelay(1,3);
         
-        LOG.INFO("启动小红书应用");
+        LOG.INFO("正在查找小红书应用图标");
+
+        var appIcon = text(CONFIG.APP_NAME).findOne(5000);
+
+        if (!appIcon) {
+            LOG.ERROR("找不到小红书应用图标");
+            throw new Error("找不到小红书应用图标");
+         }
+
+        LOG.INFO("点击小红书应用图标");
+        appIcon.click();
+        sleepRandomDelay(4, 8);
         launchApp();
         
         LOG.INFO("关闭小红书应用");
         killApp();
-    } catch (e) {
+    } catch (e) { 
         LOG.ERROR("单次运行异常: " + e.message);
         throw e;
     }
 
 }
+// 开始在小红书app里面运行逻辑了
+function launchApp() {
 
+    LOG.INFO("查找首页元素");
 
+    var homeElement = id(CONFIG.HOME_ELEMENT_ID).findOne(5000);
+    if (!homeElement) {
+        LOG.ERROR("找不到首页元素");
+        throw new Error("找不到首页元素");
+    }
+    
+    LOG.INFO("点击首页元素");
+
+    homeElement.click();
+
+    sleepRandomDelay(3, 6);
+
+    singleFlow()
+}
+// 执行小红书里面的app自动化逻辑开始了
+function singleFlow(){
+
+    LOG.INFO("开始单次操作流程");
+
+    if(random(10,20)<state.pullDownCount){
+
+        LOG.INFO("达到最大下滑次数,刷新页面")
+
+        state.pullDownCount = 0
+
+        launchApp()
+
+        return
+    }
+        // 如果所有笔记都已处理完，先滑动再查找新笔记
+    if (state.currentNoteIndex >= state.selectedNotes.length) {
+        LOG.INFO("所有选中笔记已处理完，先滑动首页");
+        randomSwipe(2, 3);
+        state.selectedNotes = []
+        state.currentNoteIndex = 0
+    }
+
+        // 如果没有选中笔记，则查找新笔记
+    if (state.selectedNotes.length === 0) {
+        LOG.INFO("查找新一批随机笔记");
+        findRandomNotes();
+    }
+
+}
 // ------------------------- 工具函数 -------------------------
+// 滑动屏幕
+function randomSwipe(minCount, maxCount) {
+    var swipeCount = random(minCount, maxCount);
+    LOG.INFO("计划在首页随机滑动" + swipeCount + "次");
+    
+    for (var i = 0; i < swipeCount && state.isRunning; i++) {
 
+        SwipeSimulator.smartSwipeHome();
+        
+        var delay = random(CONFIG.SWIPE_DELAY[0], CONFIG.SWIPE_DELAY[1]);
+        LOG.INFO("滑动后延迟" + delay + "毫秒");
+        sleep(delay);
+        
+        state.pullDownCount = state.pullDownCount + 1
+
+        LOG.INFO("下滑次数: " + (state.pullDownCount + 1));
+
+
+        
+    }
+}
 function getScreenSize() {
     var size = {
         width: device.width,
@@ -375,3 +403,4 @@ function sleepRandomDelay(minSec, maxSec) {
     LOG.INFO("随机延迟: " + delay + "毫秒");
     sleep(delay);
 }
+
